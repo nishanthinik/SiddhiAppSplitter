@@ -395,9 +395,10 @@ public class SiddhiAppSplitter {
     //usergiven source accessed by multiple siddhiApps
     private void parallelSourceStream() {
 
-        String defaultStreamName = "TempStream";
+        String defaultStreamName = "IntermediateStream";
 
-        StrSiddhiApp strSiddhiApp;
+
+        int k = 0;
 
         for (Map.Entry<String, StrSiddhiApp> stringStrSiddhiAppEntry : distributiveMap.entrySet()) {
 
@@ -410,27 +411,7 @@ public class SiddhiAppSplitter {
                     if (strStreamEntry.getValue().getIsUserGiven().equals("true")) {
                         //when parallel >1 and input Stream is a source stream
 
-
-                        if (distributiveMap.containsKey(appName + "00000000000000000")) {
-                            strSiddhiApp = distributiveMap.get(appName + "00000000000000000");
-                        } else {
-                            strSiddhiApp = new StrSiddhiApp();
-                            strSiddhiApp.setParallel("1");
-                            //all such queries will come here
-                            strSiddhiApp.setAppName(appName + "00000000000000000");
-                        }
-
-
-                        strSiddhiApp.setInputStream(strStreamEntry.getKey(), strStreamEntry.getValue().getDefinition(), "Stream", "True", "All");
-                        strSiddhiApp.setQuery("From " + strStreamEntry.getKey() + " select * insert into " + defaultStreamName);
-                        //runtimedefinition should come
-
-                        String runTimestreamDefinition = removeMetainfoStream(strStreamEntry.getKey(), strStreamEntry.getValue().getDefinition());
-                        strSiddhiApp.setOutputStream("TempStream", "${TempStream}" + runTimestreamDefinition.replaceAll(strStreamEntry.getKey(), defaultStreamName), "Stream", "false");
-                        //set publishing strategy
-                        inputStreamMap.get(strStreamEntry.getKey()).setIsUserGiven("false");
-                        inputStreamMap.get(strStreamEntry.getKey()).setDefinition("${TempStream}" + runTimestreamDefinition);
-
+                        createInterMediateSiddhiApp();
                     }
                 }
 
@@ -441,10 +422,99 @@ public class SiddhiAppSplitter {
 
     }
 
-    //if source in multiple places
-    //if source and sink case
-    //if partioned stream case
-    //setting outputstreamStrategy
+    private void createInterMediateSiddhiApp() {
+        StrSiddhiApp strSiddhiApp;
+
+        //name for intermediate
+        if (distributiveMap.containsKey(appName + "00000000000000000")) {
+            strSiddhiApp = distributiveMap.get(appName + "00000000000000000");
+        } else {
+            strSiddhiApp = new StrSiddhiApp();
+            strSiddhiApp.setParallel("1");
+            //all such queries will come here
+            strSiddhiApp.setAppName(appName + "00000000000000000");
+        }
+
+
+        strSiddhiApp.setInputStream(strStreamEntry.getKey(), strStreamEntry.getValue().getDefinition(), "Stream", "True", "All");
+        strSiddhiApp.setQuery("From " + strStreamEntry.getKey() + " select * insert into " + defaultStreamName);
+        //runtimedefinition should come
+
+        String runTimestreamDefinition = removeMetainfoStream(strStreamEntry.getKey(), strStreamEntry.getValue().getDefinition());
+        strSiddhiApp.setOutputStream("TempStream", "${TempStream}" + runTimestreamDefinition.replaceAll(strStreamEntry.getKey(), defaultStreamName), "Stream", "false");
+        //set publishing strategy
+        inputStreamMap.get(strStreamEntry.getKey()).setIsUserGiven("false");
+        inputStreamMap.get(strStreamEntry.getKey()).setDefinition("${TempStream}" + runTimestreamDefinition);
+
+    }
+
+    //change stream name
+    private void changeStreamName(String stream1, String stream2, int i) {
+
+        List<StrSiddhiApp> listSiddhiApps = new ArrayList<StrSiddhiApp>(distributiveMap.values());
+        StrSiddhiApp strSiddhiApp;
+
+        for (int k = 0; k < listSiddhiApps.size(); k++) {
+
+            if (k != i) {
+                strSiddhiApp = listSiddhiApps.get(i);
+                //change inputStreams
+                if (strSiddhiApp.getInputStreamMap().containsKey(stream1)) {
+                    strSiddhiApp.getInputStreamMap().put(stream2, strSiddhiApp.getInputStreamMap().get(stream1));
+                    strSiddhiApp.getInputStreamMap().remove(stream1);
+                    strSiddhiApp.getInputStreamMap().get(stream2).setDefinition(strSiddhiApp.getInputStreamMap().get(stream2).getDefinition().replaceAll(stream1, stream2));
+
+
+                    for (StrQuery strQuery : strSiddhiApp.getQueryList()) {
+                        strQuery.setQuery(strQuery.getQuery().replaceAll(stream1, stream2));
+                    }
+                }
+
+                //change in outputStreams
+                if (strSiddhiApp.getOutputStreamMap().containsKey(stream1)) {
+                    strSiddhiApp.getOutputStreamMap().put(stream2, strSiddhiApp.getOutputStreamMap().get(stream1));
+                    strSiddhiApp.getOutputStreamMap().remove(stream1);
+                    strSiddhiApp.getOutputStreamMap().get(stream2).setDefinition(strSiddhiApp.getOutputStreamMap().get(stream2).getDefinition().replaceAll(stream1, stream2));
+
+
+                    for (StrQuery strQuery : strSiddhiApp.getQueryList()) {
+                        strQuery.setQuery(strQuery.getQuery().replaceAll(stream1, stream2));
+                    }
+                }
+
+
+            }
+        }
+
+
+    }
+
+    //TODO:if source in multiple places
+
+    private void multiplePlaces() {
+
+        List<StrSiddhiApp> listSiddhiApps = new ArrayList<StrSiddhiApp>(distributiveMap.values());
+
+
+        StrSiddhiApp strSiddhiApp;
+
+        for (int i = 0; i < listSiddhiApps.size(); i++) {
+            for (int j = i + 1; j < listSiddhiApps.size() && j != i; j++) {
+
+                for (String key : listSiddhiApps.get(i).getInputStreamMap().keySet()) {
+                    if (listSiddhiApps.get(j).getInputStreamMap().containsKey(key)) {
+                        //more than one execGroup contain the source
+                    }
+                }
+
+            }
+        }
+    }
+
+
+    //TODO:if source and sink case
+    //TODO:if partitioned stream case
+    //TODO:setting outputstreamStrategy
 
 
     private String removeMetainfo(ExecutionElement executionElement, String strExecutionelement) {
